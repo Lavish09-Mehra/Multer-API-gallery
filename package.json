@@ -1,0 +1,17 @@
+{
+  "name": "multer-projects",
+  "version": "1.0.0",
+  "description": "This is Multer and Express based RestAPI project",
+  "license": "ISC",
+  "author": "Lavish Mehra",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "multer": "^2.2.0"
+  }
+}

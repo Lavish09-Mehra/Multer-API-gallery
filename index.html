@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Gallery</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        /* Animated gradient background - slides behind the whole page */
+        body {
+            font-family: system-ui, sans-serif; color: #222; padding: 2rem; min-height: 100vh;
+            background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c, #4facfe);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+        }
+        @keyframes gradientShift {
+            0%   { background-position: 0% 50%; }
+            50%  { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        main { max-width: 900px; margin: 0 auto; }
+
+        h1 {
+            margin-bottom: 1.5rem; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.3);
+            animation: floatTitle 3s ease-in-out infinite;
+        }
+        @keyframes floatTitle {
+            0%, 100% { transform: translateY(0); }
+            50%      { transform: translateY(-6px); }
+        }
+
+        /* Upload bar glides in from the left */
+        form.upload {
+            background: rgba(255,255,255,.95); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,.2); display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;
+            backdrop-filter: blur(6px);
+            animation: slideIn .6s ease both;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-40px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        input[type="file"] {
+            flex: 1; min-width: 220px; padding: .5rem; background: #f0f2ff;
+            border: 2px dashed #764ba2; border-radius: 8px; cursor: pointer;
+            transition: border-color .3s ease, background .3s ease, transform .3s ease;
+        }
+        input[type="file"]:hover,
+        input[type="file"]:focus {
+            border-color: #4facfe; background: #e8ecff; transform: scale(1.02);
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none;
+            padding: .6rem 1.4rem; border-radius: 8px; cursor: pointer; font-size: .95rem;
+            box-shadow: 0 5px 15px rgba(102,126,234,.4);
+            transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102,126,234,.55); filter: brightness(1.1); }
+        button:active { transform: translateY(0) scale(.97); }
+
+        /* Status message pops in with a bounce */
+        #status { margin-bottom: 1rem; font-weight: 700; animation: pop .4s ease both; }
+        #status.error { color: #ffd7d1; }
+        #status.ok { color: #ccffd8; }
+        @keyframes pop {
+            0%   { opacity: 0; transform: scale(.6); }
+            70%  { transform: scale(1.08); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.2rem; }
+
+        /* Each card rises in with a fade (JS adds a stagger delay) */
+        .card {
+            background: #fff; border-radius: 12px; overflow: hidden;
+            box-shadow: 0 8px 20px rgba(0,0,0,.18); position: relative;
+            transform: translateY(0);
+            transition: transform .3s ease, box-shadow .3s ease;
+            animation: rise .55s cubic-bezier(.25,.9,.35,1.2) both;
+        }
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(30px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .card:hover {
+            transform: translateY(-8px) scale(1.03);
+            box-shadow: 0 18px 35px rgba(0,0,0,.3);
+        }
+
+        /* Image gently zooms while hovering the card */
+        .card img {
+            width: 100%; height: 160px; object-fit: cover; display: block;
+            transition: transform .4s ease, filter .4s ease;
+        }
+        .card:hover img { transform: scale(1.12); filter: saturate(1.2); }
+
+        .card .meta { padding: .6rem; display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+        .card .name { font-size: .8rem; word-break: break-all; }
+
+        .delete {
+            background: #e74c3c; color: #fff; border: none; padding: .3rem .7rem;
+            border-radius: 6px; cursor: pointer; font-size: .8rem; white-space: nowrap;
+            transition: background .2s ease, transform .2s ease;
+        }
+        .delete:hover { background: #c0392b; transform: scale(1.1) rotate(-2deg); }
+
+        /* Empty state gently pulses */
+        .empty {
+            color: #fff; text-align: center; padding: 2rem; opacity: .9;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: .6; }
+            50%      { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Image Gallery</h1>
+        <form class="upload" id="uploadForm">
+            <input type="file" name="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple required>
+            <button type="submit">Upload Images</button>
+        </form>
+        <p id="status"></p>
+        <div class="grid" id="grid"></div>
+        <p class="empty" id="empty">No images yet. Upload some JPG, JPEG, or PNG files (max 5 MB each).</p>
+    </main>
+    <script>
+        const grid = document.getElementById('grid');
+        const empty = document.getElementById('empty');
+        const status = document.getElementById('status');
+        const form = document.getElementById('uploadForm');
+
+        function setStatus(message, ok) {
+            status.textContent = message;
+            status.className = ok ? 'ok' : 'error';
+            if (ok) setTimeout(() => { status.textContent = ''; }, 4000);
+        }
+
+        async function loadGallery() {
+            const res = await fetch('/images');
+            const data = await res.json();
+            grid.innerHTML = '';
+            empty.style.display = data.count ? 'none' : 'block';
+            data.images.forEach(({ filename, url }, i) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.style.animationDelay = `${i * 90}ms`;
+                card.innerHTML = `
+                    <a href="${url}" target="_blank"><img src="${url}" alt="${filename}"></a>
+                    <div class="meta">
+                        <span class="name">${filename}</span>
+                        <button class="delete" data-name="${filename}">Delete</button>
+                    </div>`;
+                grid.appendChild(card);
+            });
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fd = new FormData(form);
+            const res = await fetch('/images/upload', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (!res.ok) {
+                setStatus(data.message || 'Upload failed', false);
+                return;
+            }
+            setStatus(data.message, true);
+            form.reset();
+            loadGallery();
+        });
+
+        grid.addEventListener('click', async (e) => {
+            if (!e.target.classList.contains('delete')) return;
+            const name = e.target.dataset.name;
+            const res = await fetch(`/images/${encodeURIComponent(name)}`, { method: 'DELETE' });
+            const data = await res.json();
+            setStatus(data.message, res.ok);
+            loadGallery();
+        });
+
+        loadGallery();
+    </script>
+</body>
+</html>
